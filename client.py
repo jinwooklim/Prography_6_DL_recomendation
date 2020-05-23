@@ -18,3 +18,9 @@ success = response.json()["success"]
 print(success)
 
 print(response.json())
+
+
+URL = 'http://localhost:5000/c'
+id = 381
+response = requests.post(URL, data=json.dumps({"user": id}))
+print(response.json())

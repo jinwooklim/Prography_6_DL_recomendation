@@ -4,7 +4,11 @@ from model import SiameseNetwork
 import json
 import torch
 
-device = "cuda:0"
+from utils import cosine_similarity
+import numpy as np
+import pandas as pd
+
+device = "cpu"
 
 app = Flask(__name__)
 
@@ -45,6 +49,39 @@ def map_recomend():
 
     return jsonify({'success': True,
                     'vector': d_128
+                    }), HTTPStatus.OK
+
+
+@app.route("/c", methods=['POST'])
+def get_memory_based_user_recommendation():
+    request_data = json.loads(request.data)["user"]
+
+    # Get User, Location entity is not implemented.
+    # So We use, a csv file for this API.
+    header = ['user_id', 'location_id', 'frequency']
+    user_location_table = pd.read_csv('./data/preprocessed_data2.csv', sep='\t', names=header)
+    n_users = user_location_table.user_id.unique().shape[0]
+    n_locations = user_location_table.location_id.unique().shape[0]
+    user_location_table = user_location_table.to_numpy()
+    user_location_frequency_matrix = np.zeros((n_users, n_locations))
+    # User x Location matrix
+    # user_location_frequency_matrix can be replaced to user-match-location table JOIN.
+    for checkin in user_location_table:
+        user_location_frequency_matrix[checkin[0], checkin[1]] = checkin[2]
+
+    # User x User matrix
+    user_similarity = cosine_similarity(user_location_frequency_matrix)
+    selected_user_similarity = user_similarity[request_data]
+
+    # return top-10 similarity user's id
+    # Ref : https://stackoverflow.com/questions/6910641/how-do-i-get-indices-of-n-maximum-values-in-a-numpy-array
+    top10_id = selected_user_similarity.argsort()[-11:][::-1]  # cost : O(N)
+    top10_id = top10_id[1:11]  # remove it self
+    top10_sim = selected_user_similarity[top10_id]
+    top10 = {'user_ids': top10_id.tolist(),
+             'user_sims': top10_sim.tolist()}
+    return jsonify({'success': True,
+                    'top10': top10
                     }), HTTPStatus.OK
 
 
