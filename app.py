@@ -8,24 +8,19 @@ from utils import cosine_similarity
 import numpy as np
 import pandas as pd
 
+
+# Setting for PyTorch
 device = "cpu"
-
-app = Flask(__name__)
-
 model = SiameseNetwork().to(device)
-model.load_state_dict(torch.load("./model2.pt", map_location=torch.device(device)))
+model.load_state_dict(torch.load("./data/model2.pt", map_location=torch.device(device)))
 model.eval()
 
-A = 1
+# Setting for Flask
+app = Flask(__name__)
 
 
-@app.route("/a")
-def hello():
-    return "<h1 style='color:blue'>Hello There!</h1>"
-
-
-@app.route('/b', methods=['POST'])
-def map_recomend():
+@app.route('/map-recommend', methods=['GET'])
+def map_recommend():
     request_data = json.loads(request.data)["user"]
 
     latitude_0 = request_data[0]["latitude_0"]
@@ -44,7 +39,6 @@ def map_recomend():
 
     vector_tensor = model(latitude_0, longitude_0, latitude_1, longitude_1, latitude_2, longitude_2)
     vector = vector_tensor.to("cpu").squeeze(dim=0)
-    # print("A", A.to("cpu").tolist())
     d_128 = vector.to("cpu").tolist()
 
     return jsonify({'success': True,
@@ -52,9 +46,9 @@ def map_recomend():
                     }), HTTPStatus.OK
 
 
-@app.route("/c", methods=['POST'])
+@app.route("/user-recommend", methods=['GET'])
 def get_memory_based_user_recommendation():
-    request_data = json.loads(request.data)["user"]
+    request_data = json.loads(request.data)["user_id"]
 
     # Get User, Location entity is not implemented.
     # So We use, a csv file for this API.
