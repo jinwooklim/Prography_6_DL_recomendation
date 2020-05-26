@@ -8,7 +8,6 @@ from utils import cosine_similarity
 import numpy as np
 import pandas as pd
 
-
 # Setting for PyTorch
 device = "cpu"
 model = SiameseNetwork().to(device)
@@ -17,6 +16,19 @@ model.eval()
 
 # Setting for Flask
 app = Flask(__name__)
+
+# Get User, Location entity is not implemented.
+# So We use, a csv file for this API.
+header = ['user_id', 'location_id', 'frequency']
+user_location_table = pd.read_csv('./data/preprocessed_data2.csv', sep='\t', names=header)
+n_users = user_location_table.user_id.unique().shape[0]
+n_locations = user_location_table.location_id.unique().shape[0]
+user_location_table = user_location_table.to_numpy()
+user_location_frequency_matrix = np.zeros((n_users, n_locations))
+# User x Location matrix
+# user_location_frequency_matrix can be replaced to user-match-location table JOIN.
+for checkin in user_location_table:
+    user_location_frequency_matrix[checkin[0], checkin[1]] = checkin[2]
 
 
 @app.route('/map-recommend', methods=['GET'])
@@ -50,21 +62,8 @@ def map_recommend():
 def get_memory_based_user_recommendation():
     request_data = json.loads(request.data)["user_id"]
 
-    # Get User, Location entity is not implemented.
-    # So We use, a csv file for this API.
-    header = ['user_id', 'location_id', 'frequency']
-    user_location_table = pd.read_csv('./data/preprocessed_data2.csv', sep='\t', names=header)
-    n_users = user_location_table.user_id.unique().shape[0]
-    n_locations = user_location_table.location_id.unique().shape[0]
-    user_location_table = user_location_table.to_numpy()
-    user_location_frequency_matrix = np.zeros((n_users, n_locations))
-    # User x Location matrix
-    # user_location_frequency_matrix can be replaced to user-match-location table JOIN.
-    for checkin in user_location_table:
-        user_location_frequency_matrix[checkin[0], checkin[1]] = checkin[2]
-
     # User x User matrix
-    user_similarity = cosine_similarity(user_location_frequency_matrix)
+    user_similarity = cosine_similarity(user_location_frequency_matrix, kind='user')
     selected_user_similarity = user_similarity[request_data]
 
     # return top-10 similarity user's id
@@ -74,6 +73,26 @@ def get_memory_based_user_recommendation():
     top10_sim = selected_user_similarity[top10_id]
     top10 = {'user_ids': top10_id.tolist(),
              'user_sims': top10_sim.tolist()}
+    return jsonify({'success': True,
+                    'top10': top10
+                    }), HTTPStatus.OK
+
+
+@app.route("/location-recommend", methods=['GET'])
+def get_memory_based_location_recommendation():
+    request_data = json.loads(request.data)["location_id"]
+
+    # Location x Location matrix
+    location_similarity = cosine_similarity(user_location_frequency_matrix, kind='location')
+    selected_location_similarity = location_similarity[request_data]
+
+    # return top-10 similarity location's id
+    # Ref : https://stackoverflow.com/questions/6910641/how-do-i-get-indices-of-n-maximum-values-in-a-numpy-array
+    top10_id = selected_location_similarity.argsort()[-11:][::-1]  # cost : O(N)
+    top10_id = top10_id[1:11]  # remove it self
+    top10_sim = selected_location_similarity[top10_id]
+    top10 = {'location_ids': top10_id.tolist(),
+             'location_sims': top10_sim.tolist()}
     return jsonify({'success': True,
                     'top10': top10
                     }), HTTPStatus.OK
