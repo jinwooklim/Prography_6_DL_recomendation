@@ -1,17 +1,19 @@
 from flask import Flask, request, Response, jsonify
 from http import HTTPStatus
-from model import SiameseNetwork
 import json
 import torch
-
-from utils import cosine_similarity
 import numpy as np
 import pandas as pd
 
+from app.module.model import SiameseNetwork
+from app.module.utils import cosine_similarity
+
+
 # Setting for PyTorch
 device = "cpu"
+MODEL_PATH = "./app/static/model2.pt"
 model = SiameseNetwork().to(device)
-model.load_state_dict(torch.load("./data/model2.pt", map_location=torch.device(device)))
+model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device(device)))
 model.eval()
 
 # Setting for Flask
@@ -19,8 +21,9 @@ app = Flask(__name__)
 
 # Get User, Location entity is not implemented.
 # So We use, a csv file for this API.
+DATA_PATH = './app/static/preprocessed_data2.csv'
 header = ['user_id', 'location_id', 'frequency']
-user_location_table = pd.read_csv('./data/preprocessed_data2.csv', sep='\t', names=header)
+user_location_table = pd.read_csv(DATA_PATH, sep='\t', names=header)
 n_users = user_location_table.user_id.unique().shape[0]
 n_locations = user_location_table.location_id.unique().shape[0]
 user_location_table = user_location_table.to_numpy()
